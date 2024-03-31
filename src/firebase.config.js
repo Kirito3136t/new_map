@@ -6,12 +6,13 @@ import {getFirestore} from 'firebase/firestore'
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCI9Zf1eHeelSsVcSaSKIj4yJxR0BaFBC8",
-  authDomain: "mapping-c1fa2.firebaseapp.com",
-  projectId: "mapping-c1fa2",
-  storageBucket: "mapping-c1fa2.appspot.com",
-  messagingSenderId: "982576276876",
-  appId: "1:982576276876:web:35ee1f3b065910ec69a2a9",
+  apiKey: "AIzaSyDHDoO_Ew_geSdY67qhvFmBE_sVTD5Owdo",
+  authDomain: "majorproject-b24c2.firebaseapp.com",
+  databaseURL: "https://majorproject-b24c2-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "majorproject-b24c2",
+  storageBucket: "majorproject-b24c2.appspot.com",
+  messagingSenderId: "242017917000",
+  appId: "1:242017917000:web:52cf2d13de62cc8bafa07d"
 };
 
 // Initialize Firebase

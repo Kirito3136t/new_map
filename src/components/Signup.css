@@ -1,0 +1,70 @@
+/* Signup.css */
+
+  
+.App {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    margin-top: 105px;
+  }
+  
+  .row {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+  }
+  
+  .pointer,
+  .activeColor {
+    cursor: pointer;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin: 0 10px;
+    background-color: #f2f2f2;
+    color: #333;
+    font-weight: bold;
+    user-select: none;
+  }
+  
+  .activeColor {
+    background-color: #00df9a;
+    color: #fff;
+  }
+  
+  h1 {
+    margin-bottom: 20px;
+  }
+  
+  form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  input {
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
+  
+  .p {
+    color: #00df9a;
+    cursor: pointer;
+  }
+  
+  .b{
+    padding: 10px 20px;
+    background-color: #00df9a;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background-color: #00df9a;
+  }
+  

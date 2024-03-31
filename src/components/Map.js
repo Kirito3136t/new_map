@@ -8,84 +8,65 @@ import {
   Input,
   SkeletonText,
   Text,
+  Stack, 
+  Badge
 } from "@chakra-ui/react";
 import { FaLocationArrow, FaTimes } from "react-icons/fa";
-
+import { ref, onValue } from 'firebase/database';
+import StartFirebase from "./firebase";
 import {
   useJsApiLoader,
   GoogleMap,
   Marker,
   Autocomplete,
   DirectionsRenderer,
+  Circle
 } from "@react-google-maps/api";
-import { useRef, useState } from "react";
+import { useRef, useState,useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import pothole from "../assets/img/pothole.jpg";
-
 const center = { lat: 19.0522, lng: 72.9005 };
-const potholeLocations = [
-  {lat:19.042095,lng:72.894223},
 
-{lat:19.042060,lng:72.894105},
 
-{lat:19.042558,lng:72.893615},
-
-{lat:19.042404,lng:72.893569},
-
-{lat:19.042859,lng:72.893533},
-
-{lat:19.043005,lng:72.893542},
-
-{lat:19.043108,lng:72.893542},
-
-{lat:19.043108,lng:72.893542},
-
-{lat:19.043750,lng:72.893543},
-
-{lat:19.043750,lng:72.893543},
-
-{lat:19.044287,lng:72.893532},
-
-{lat:19.044449,lng:72.893500},
-
-{lat:19.044571,lng:72.893435},
-
-{lat:19.045352,lng:72.893746},
-
-{lat:19.045494,lng:72.893918},
-
-{lat:19.045666,lng:72.895098},
-
-{lat:19.045702,lng:72.895933},
-
-{lat:19.045717,lng:72.896041},
-
-{lat:19.045746,lng:72.896329},
-
-{lat:19.045745,lng:72.896344},
-
-{lat:19.045748,lng:72.896362},
-
-{lat:19.045784,lng:72.89672},
-
-{lat:19.045784,lng:72.896832},
-
-{lat:19.045821,lng:72.897131},
-
-{lat:19.045992,lng:72.87285},
-
-{lat:19.045992,lng:72.87285}
-  // Add more pothole locations here as needed
-];
+function Legend() {
+  return (
+    <Box position="absolute" bottom={4} right={4}>
+      <Stack direction="row" spacing={4}>
+        <Badge colorScheme="green">Low Pothole Density</Badge>
+        <Badge colorScheme="orange">Medium Pothole Density</Badge>
+        <Badge colorScheme="red">High Pothole Density</Badge>
+      </Stack>
+    </Box>
+  );
+}
 
 function Map() {
+  const [readings, setReadings] = useState([]);
+  const [resulting,setResulting]=useState();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const userId = 'rtSGeyCrs3a8sdLYlEjv7i8MsY93';
+    const { database } = StartFirebase();
+    const dbRef = ref(database, `UsersData/${userId}/readings`);
+  
+    onValue(dbRef, async (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const readingsArray = Object.values(data)
+          .filter(reading => typeof reading.latitude === 'number' && typeof reading.longitude === 'number')
+          .map((reading) => ({
+            lat: reading.latitude,
+            lng: reading.longitude,
+          }));
+        setReadings(readingsArray);
+      }
+    });
+  }, []);
   
 
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: "AIzaSyDnyb11tWZluAFYBaG8sEVYpu2L6nwIWPE",
+    googleMapsApiKey: "AIzaSyAIqk3oz4aS5DDAH5ZzZtcrJwNbG-PqGPY",
     libraries: ["places"],
   });
 
@@ -98,85 +79,208 @@ function Map() {
   const [distance, setDistance] = useState("");
   const [duration, setDuration] = useState("");
   const [buttonClicked, setButtonClicked] = useState(false);
-  const [generatedPoints, setGeneratedPoints] = useState([]);
+  const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
+ 
 
   /** @type React.MutableRefObject<HTMLInputElement> */
   const originRef = useRef();
   /** @type React.MutableRefObject<HTMLInputElement> */
-  const destiantionRef = useRef();
+  const destinationRef = useRef();
 
-  const numRandomPoints = potholeLocations.length; // Specify the number of random points to generate
 
-  // Function to generate random points between the origin and destination
-  function generateRandomPoints(origin, numPoints) {
-    const points = [];
-    for (let i = 0; i < numPoints; i++) {
-      const randomLat = origin.lat + 1*0.02; // Adjust the range as needed
-      const randomLng = origin.lng + 1 * 0.02; // Adjust the range as needed
-      points.push({ lat: randomLat, lng: randomLng });
-    }
-    return points;
-  }
 
   if (!isLoaded) {
     return <SkeletonText />;
   }
 
-  const renderPotholeMarkers = () => {
-    return potholeLocations.map((location, index) => (
-      <Marker
-        key={index}
-        position={location}
-        icon={{
-          url: pothole, // Corrected URL format
-          scaledSize: new window.google.maps.Size(30, 30),
-        }}
-      />
-    ));
+
+  const getDensityColor = (index, potholeDensity, route) => {
+    const densityThresholds = {
+      low: 0.1,
+      medium: 0.3,
+    };
+  
+    const potholeLatLng = new window.google.maps.LatLng(
+      readings[index].lat,
+      readings[index].lng
+    );
+  
+    // Calculate distance of pothole from the route
+    const distanceToRoute = window.google.maps.geometry.spherical.computeDistanceBetween(
+      potholeLatLng,
+      route.overview_path[0]
+    );
+  
+    // Find the minimum distance among all potholes
+    const minDistance = Math.min(
+      ...readings.map((location, i) => {
+        if (i !== index) {
+          const otherPotholeLatLng = new window.google.maps.LatLng(
+            location.lat,
+            location.lng
+          );
+          return window.google.maps.geometry.spherical.computeDistanceBetween(
+            otherPotholeLatLng,
+            route.overview_path[0]
+          );
+        }
+        return Infinity;
+      })
+    );
+  
+    if (distanceToRoute === 0) {
+      return "red"; // Pothole is on the route
+    } else if (distanceToRoute === minDistance) {
+      return "red"; // Pothole with minimum distance
+    } else if (index / readings.length <= densityThresholds.low) {
+      return "green"; // Low density
+    } else if (index / readings.length <= densityThresholds.medium) {
+      return "orange"; // Medium density
+    } else {
+      return "red"; // High density
+    }
   };
 
 
-  async function calculateRoute() {
-    if (originRef.current.value === "" || destiantionRef.current.value === "") {
-      return;
-    }
-    // eslint-disable-next-line no-undef
-    const directionsService = new google.maps.DirectionsService();
-    const results = await directionsService.route({
-      origin: originRef.current.value,
-      destination: destiantionRef.current.value,
-      // eslint-disable-next-line no-undef
-      travelMode: google.maps.TravelMode.DRIVING,
-    });
-    console.log(results);
-    setDirectionsResponse(results);
-    setDistance(results.routes[0].legs[0].distance.text);
-    setDuration(results.routes[0].legs[0].duration.text);
-    setButtonClicked(true);
-    if (
-      results &&
-      results.routes[0] &&
-      results.routes[0].legs[0] &&
-      results.routes[0].legs[0].start_location
-    ) {
-      const newGeneratedPoints = generateRandomPoints(
-        {
-          lat: results.routes[0].legs[0].start_location.lat(),
-          lng: results.routes[0].legs[0].start_location.lng(),
-        },
-        numRandomPoints
-      );
-      setGeneratedPoints(newGeneratedPoints); // Update the state variable
-      console.log(newGeneratedPoints);
-    }
+
+const renderPotholeMarkers = (route) => {
+  if (!directionsResponse) {
+    return null;
   }
 
+  const bounds = new window.google.maps.LatLngBounds();
+  const potholeDensity = readings.length / route.overview_path.length;
+
+  // Extend bounds with each point on the route
+  route.legs.forEach((leg) => {
+    leg.steps.forEach((step) => {
+      const path = step.path;
+      path.forEach((point) => bounds.extend(point));
+    });
+  });
+
+  return readings.map((location, index) => {
+    // Check if location contains numerical values for lat and lng
+    if (typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+      console.error('Invalid location:', location);
+      return null;
+    }
+
+    const potholeLatLng = new window.google.maps.LatLng(
+      location.lat,
+      location.lng
+    );
+
+    // Check if pothole is within the route bounds
+    if (bounds.contains(potholeLatLng)) {
+      const densityColor = getDensityColor(index, potholeDensity, route);
+
+      return (
+        <Circle
+          key={index}
+          center={location}
+          radius={10} // Adjust the radius as needed
+          options={{
+            fillColor: densityColor,
+            fillOpacity: 1,
+            strokeWeight: 0,
+          }}
+        />
+      );
+    } else {
+      return null; // Pothole is outside the route bounds
+    }
+  });
+};
+
+const renderPotholesWithinRoute = (route) => {
+  if (!directionsResponse) {
+    return null;
+  }
+
+  const bounds = new window.google.maps.LatLngBounds();
+  const potholesWithinRoute = [];
+
+  // Extend bounds with each point on the route
+  route.legs.forEach((leg) => {
+    leg.steps.forEach((step) => {
+      const path = step.path;
+      path.forEach((point) => bounds.extend(point));
+    });
+  });
+
+  readings.forEach((location, index) => {
+    // Check if location contains numerical values for lat and lng
+    if (typeof location.lat === 'number' && typeof location.lng === 'number') {
+      const potholeLatLng = new window.google.maps.LatLng(
+        location.lat,
+        location.lng
+      );
+
+      // Check if pothole is within the route bounds
+      if (bounds.contains(potholeLatLng)) {
+        potholesWithinRoute.push(location);
+      }
+    }
+  });
+
+  return potholesWithinRoute;
+};
+
+
+async function calculateRoute() {
+  if (originRef.current.value === "" || destinationRef.current.value === "") {
+    return;
+  }
+
+  try {
+    // Reset previous search results
+    setDirectionsResponse(null);
+    setDistance("");
+    setDuration("");
+    setButtonClicked(false);
+
+    const directionsService = new window.google.maps.DirectionsService();
+    const results = await directionsService.route({
+      origin: originRef.current.value,
+      destination: destinationRef.current.value,
+      travelMode: window.google.maps.TravelMode.DRIVING,
+      provideRouteAlternatives: true, // Ensure this is set to true
+    });
+
+    setResulting(results);
+    console.log(resulting)
+    
+
+    console.log("API Results:", results); // Log the results to see if it contains multiple routes
+
+    // Update state only if the component is still mounted
+    if (map) {
+      setDirectionsResponse(results);
+      setDistance(results.routes[0].legs[0].distance.text);
+      setDuration(results.routes[0].legs[0].duration.text);
+      setButtonClicked(true);
+    }
+  } catch (error) {
+    console.error("Error calculating route:", error);
+  }
+}
+
+const handleNextRoute = () => {
+  if (directionsResponse && currentRouteIndex < directionsResponse.routes.length - 1) {
+    setCurrentRouteIndex(currentRouteIndex + 1);
+  }
+};
+
+  
+
   function clearRoute() {
+    console.log("clear routing")
     setDirectionsResponse(null);
     setDistance("");
     setDuration("");
     originRef.current.value = "";
-    destiantionRef.current.value = "";
+    destinationRef.current.value = "";
     setButtonClicked(false);
   }
 
@@ -207,8 +311,12 @@ function Map() {
             <DirectionsRenderer directions={directionsResponse} />
           )}
 
+          
           {/* Add pothole markers to the map */}
-          {buttonClicked && renderPotholeMarkers()}
+          {buttonClicked && renderPotholeMarkers(directionsResponse.routes[0])}
+{/* Add legend */}
+<Legend />
+          
         </GoogleMap>
       </Box>
       <Box
@@ -231,30 +339,33 @@ function Map() {
               <Input
                 type="text"
                 placeholder="Destination"
-                ref={destiantionRef}
+                ref={destinationRef}
               />
             </Autocomplete>
           </Box>
 
           <ButtonGroup>
-            <Button colorScheme="pink" type="submit" onClick={calculateRoute}>
-              Calculate Route
-            </Button>
-            <ButtonGroup>
-              <Button colorScheme="pink" type="submit" onClick={handleGoback}>
-                Go Back
-              </Button>
-            </ButtonGroup>
-            <IconButton
-              aria-label="center back"
-              icon={<FaTimes />}
-              onClick={clearRoute}
-            />
-          </ButtonGroup>
+      <Button colorScheme="pink" type="submit" onClick={calculateRoute}>
+        Calculate Route
+      </Button>
+      <Button colorScheme="pink" type="submit" onClick={handleNextRoute}>
+        Next Route
+      </Button>
+      <Button colorScheme="pink" type="submit" onClick={handleGoback}>
+        Go Back
+      </Button>
+      <IconButton
+        aria-label="center back"
+        icon={<FaTimes />}
+        onClick={clearRoute}
+      />
+    </ButtonGroup>
         </HStack>
         <HStack spacing={4} mt={4} justifyContent="space-between">
           <Text>Distance: {distance} </Text>
           <Text>Duration: {duration} </Text>
+          <Text>No of potholes within route: {directionsResponse && directionsResponse.routes && renderPotholesWithinRoute(directionsResponse.routes[currentRouteIndex]).length}</Text>
+          <Text>Routes : {resulting && resulting.length}</Text>
           <IconButton
             aria-label="center back"
             icon={<FaLocationArrow />}

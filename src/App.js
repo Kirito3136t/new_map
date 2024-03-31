@@ -7,6 +7,10 @@ import Navbar from './components/Navbar';
 import Newsletter from './components/Newsletter';
 import Maps from './components/Maps';
 import All from './components/All';
+import RealtimeData from './components/About';
+import 'bootstrap/dist/css/bootstrap.min.css';
+//import Signup from './components/Signup';
+
 import {
   BrowserRouter as Router,
   Routes,
@@ -15,6 +19,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import About from './components/About';
+import Signup from './components/Signup';
 
 function App() {
   return (
@@ -29,8 +34,8 @@ function App() {
         <Routes>
           <Route path="/" element={<All />}></Route>
           <Route path="/maps" element={<Maps />}></Route>
-          <Route path="/about" element={<About />}></Route>
-
+          <Route path="/Signup" element={<Signup />}></Route>
+          <Route path="/about" element={<RealtimeData />}></Route>
         </Routes>
       </Router>
       {/* <Maps /> */}
