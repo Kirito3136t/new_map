@@ -42,7 +42,6 @@ function Legend() {
 
 function Map() {
   const [readings, setReadings] = useState([]);
-  const [resulting,setResulting]=useState();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,12 +53,13 @@ function Map() {
       const data = snapshot.val();
       if (data) {
         const readingsArray = Object.values(data)
-          .filter(reading => typeof reading.latitude === 'number' && typeof reading.longitude === 'number')
+          // .filter(reading => typeof reading.latitude === 'number' && typeof reading.longitude === 'number')
           .map((reading) => ({
-            lat: reading.latitude,
-            lng: reading.longitude,
+            lat: typeof reading.latitude === 'number' ? reading.latitude : parseFloat(reading.latitude),
+            lng: typeof reading.longitude === 'number' ? reading.longitude : parseFloat(reading.longitude),
           }));
         setReadings(readingsArray);
+        console.log(readingsArray)
       }
     });
   }, []);
@@ -80,6 +80,7 @@ function Map() {
   const [duration, setDuration] = useState("");
   const [buttonClicked, setButtonClicked] = useState(false);
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
+  const [noRoutes,setNoRoutes]=useState(0);
  
 
   /** @type React.MutableRefObject<HTMLInputElement> */
@@ -143,55 +144,56 @@ function Map() {
 
 
 
-const renderPotholeMarkers = (route) => {
-  if (!directionsResponse) {
-    return null;
-  }
-
-  const bounds = new window.google.maps.LatLngBounds();
-  const potholeDensity = readings.length / route.overview_path.length;
-
-  // Extend bounds with each point on the route
-  route.legs.forEach((leg) => {
-    leg.steps.forEach((step) => {
-      const path = step.path;
-      path.forEach((point) => bounds.extend(point));
-    });
-  });
-
-  return readings.map((location, index) => {
-    // Check if location contains numerical values for lat and lng
-    if (typeof location.lat !== 'number' || typeof location.lng !== 'number') {
-      console.error('Invalid location:', location);
+  const renderPotholeMarkers = (route) => {
+    if (!directionsResponse || !readings.length) {
       return null;
     }
-
-    const potholeLatLng = new window.google.maps.LatLng(
-      location.lat,
-      location.lng
-    );
-
-    // Check if pothole is within the route bounds
-    if (bounds.contains(potholeLatLng)) {
-      const densityColor = getDensityColor(index, potholeDensity, route);
-
-      return (
-        <Circle
-          key={index}
-          center={location}
-          radius={10} // Adjust the radius as needed
-          options={{
-            fillColor: densityColor,
-            fillOpacity: 1,
-            strokeWeight: 0,
-          }}
-        />
+  
+    const bounds = new window.google.maps.LatLngBounds();
+    const potholeDensity = readings.length / route.overview_path.length;
+  
+    // Extend bounds with each point on the route
+    route.legs.forEach((leg) => {
+      leg.steps.forEach((step) => {
+        const path = step.path;
+        path.forEach((point) => bounds.extend(point));
+      });
+    });
+  
+    return readings.map((location, index) => {
+      // Check if location contains numerical values for lat and lng
+      if (typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+        console.error('Invalid location:', location);
+        return null;
+      }
+  
+      const potholeLatLng = new window.google.maps.LatLng(
+        location.lat,
+        location.lng
       );
-    } else {
-      return null; // Pothole is outside the route bounds
-    }
-  });
-};
+  
+      // Check if pothole is within the route bounds
+      if (bounds.contains(potholeLatLng)) {
+        const densityColor = getDensityColor(index, potholeDensity, route);
+  
+        return (
+          <Circle
+            key={index}
+            center={location}
+            radius={10} // Adjust the radius as needed
+            options={{
+              fillColor: densityColor,
+              fillOpacity: 1,
+              strokeWeight: 0,
+            }}
+          />
+        );
+      } else {
+        return null; // Pothole is outside the route bounds
+      }
+    });
+  };
+  
 
 const renderPotholesWithinRoute = (route) => {
   if (!directionsResponse) {
@@ -247,12 +249,8 @@ async function calculateRoute() {
       travelMode: window.google.maps.TravelMode.DRIVING,
       provideRouteAlternatives: true, // Ensure this is set to true
     });
-
-    setResulting(results);
-    console.log(resulting)
     
-
-    console.log("API Results:", results); // Log the results to see if it contains multiple routes
+    setNoRoutes(results.routes.length);
 
     // Update state only if the component is still mounted
     if (map) {
@@ -265,12 +263,15 @@ async function calculateRoute() {
     console.error("Error calculating route:", error);
   }
 }
-
 const handleNextRoute = () => {
   if (directionsResponse && currentRouteIndex < directionsResponse.routes.length - 1) {
     setCurrentRouteIndex(currentRouteIndex + 1);
+  } else {
+    // If current route index exceeds the number of routes, loop back to the first route
+    setCurrentRouteIndex(0);
   }
 };
+
 
   
 
@@ -308,16 +309,17 @@ const handleNextRoute = () => {
         >
           <Marker position={center} />
           {directionsResponse && (
-            <DirectionsRenderer directions={directionsResponse} />
+            <DirectionsRenderer
+              directions={{
+                ...directionsResponse,
+                routes: [directionsResponse.routes[currentRouteIndex]],
+              }}
+            />
           )}
-
-          
-          {/* Add pothole markers to the map */}
-          {buttonClicked && renderPotholeMarkers(directionsResponse.routes[0])}
-{/* Add legend */}
-<Legend />
-          
+          {directionsResponse && renderPotholeMarkers(directionsResponse.routes[currentRouteIndex])}
         </GoogleMap>
+
+
       </Box>
       <Box
         p={4}
@@ -361,11 +363,11 @@ const handleNextRoute = () => {
       />
     </ButtonGroup>
         </HStack>
-        <HStack spacing={4} mt={4} justifyContent="space-between">
-          <Text>Distance: {distance} </Text>
-          <Text>Duration: {duration} </Text>
+        <HStack spacing={4}>
+          <Text>Distance: {directionsResponse && directionsResponse.routes[currentRouteIndex].legs[0].distance.text}</Text>
+          <Text>Duration: {directionsResponse && directionsResponse.routes[currentRouteIndex].legs[0].duration.text}</Text>
           <Text>No of potholes within route: {directionsResponse && directionsResponse.routes && renderPotholesWithinRoute(directionsResponse.routes[currentRouteIndex]).length}</Text>
-          <Text>Routes : {resulting && resulting.length}</Text>
+          <Text>Routes : {noRoutes ? noRoutes : 0}</Text>
           <IconButton
             aria-label="center back"
             icon={<FaLocationArrow />}
